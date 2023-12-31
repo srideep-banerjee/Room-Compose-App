@@ -29,6 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.wastesamaritanassignment1.R
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 
 @Composable
 fun AddPhotoButton(onClick: ()->Unit) {
@@ -54,4 +57,10 @@ fun AddPhotoButton(onClick: ()->Unit) {
     }
 }
 
-
+fun Context.createImageFile(): File {
+    // Create an image file name
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+    val imageFileName = "JPEG_" + timeStamp + "_"
+    val image = File("${filesDir.absolutePath}${File.separator}$imageFileName.jpg");
+    return image
+}

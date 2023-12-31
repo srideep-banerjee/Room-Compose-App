@@ -125,22 +125,6 @@ class ItemDetails : ComponentActivity() {
                         }
                     }
 
-                val galleryLauncher =
-                    rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uriList ->
-                        if(uriList != null) {
-                            itemDetailsViewModel.copyFileAsync(
-                                filesDir.absolutePath,
-                                contentResolver.openInputStream(uriList)!!
-                            ) {
-                                val mutImgs = imgState.toMutableList()
-                                mutImgs.add(0, it)
-                                imgState = mutImgs.toList()
-                            }
-                        } else {
-                            Toast.makeText(context, "Image not picked", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-
                 val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
                 ) {
@@ -179,41 +163,24 @@ class ItemDetails : ComponentActivity() {
                             onSave = { _,_,_,_->
 
                             },
-                            onAddPhoto = {bottomSheetOpen = true},
+                            onAddPhoto = {
+                                file = context.createImageFile()
+                                uri = FileProvider.getUriForFile(
+                                    Objects.requireNonNull(context),
+                                    BuildConfig.APPLICATION_ID + ".provider", file
+                                )
+
+                                val permissionCheckResult =
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                                if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
+                                    cameraLauncher.launch(uri)
+                                } else {
+                                    // Request a permission
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            },
                             modifier = Modifier.padding(it)
                         )
-                    }
-                    if (bottomSheetOpen) {
-                        ModalBottomSheet(
-                            sheetState = sheetState,
-                            onDismissRequest = { bottomSheetOpen = false }
-                        ) {
-                            AddImageModeSelector {
-                                bottomSheetOpen = false
-
-                                when(it) {
-                                    ImageMethodSelectionType.CAMERA-> {
-                                        file = context.createImageFile()
-                                        uri = FileProvider.getUriForFile(
-                                            Objects.requireNonNull(context),
-                                            BuildConfig.APPLICATION_ID + ".provider", file
-                                        )
-
-                                        val permissionCheckResult =
-                                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                                        if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
-                                            cameraLauncher.launch(uri)
-                                        } else {
-                                            // Request a permission
-                                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                                        }
-                                    }
-                                    ImageMethodSelectionType.GALLERY->{
-                                        galleryLauncher.launch("image/*")
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
