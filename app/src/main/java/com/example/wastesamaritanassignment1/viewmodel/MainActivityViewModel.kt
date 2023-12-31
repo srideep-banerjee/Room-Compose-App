@@ -25,6 +25,9 @@ class MainActivityViewModel(application: Application): AndroidViewModel(applicat
     private val _itemList = mutableListOf<ItemDetailsShortened>()
     val itemList = _itemList.toMutableStateList()
 
+    var sortOrder = ItemOrder.NAME_ASC
+        private set
+
     val database: ItemDatabase get() {
         while (!this::_database.isInitialized);
         return _database
@@ -47,6 +50,7 @@ class MainActivityViewModel(application: Application): AndroidViewModel(applicat
     }
 
     fun updateSortOrder(itemOrder: ItemOrder) {
+        sortOrder = itemOrder
         if(_isLoading.value) return
         viewModelScope.launch(Dispatchers.Main) {
             _isLoading.emit(true)

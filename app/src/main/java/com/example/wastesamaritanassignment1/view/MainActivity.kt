@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,9 +25,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -39,6 +41,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
@@ -79,9 +82,14 @@ class MainActivity : ComponentActivity() {
             WasteSamaritanAssignment1Theme {
                 // A surface container using the 'background' color from the theme
                 val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+                val showSortOrderDialog = rememberSaveable {
+                    mutableStateOf(false)
+                }
 
                 Scaffold(
-                    topBar = { TopBar(scrollBehavior) },
+                    topBar = { TopBar(scrollBehavior) {
+                        showSortOrderDialog.value = true
+                    } },
                     floatingActionButton = { AddButton() },
                     modifier = Modifier
                         .fillMaxSize()
@@ -103,11 +111,20 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     } else {
+
                         ItemList(
                             list =  mainActivityViewModel.itemList.toMutableStateList(),
 
                             modifier = Modifier.padding(it)
                         )
+
+                        if (showSortOrderDialog.value) {
+                            SortOrderDialog(currentSortOrder = mainActivityViewModel.sortOrder, ) {sortOrder->
+                                showSortOrderDialog.value = false
+                                if(sortOrder != null)
+                                    mainActivityViewModel.updateSortOrder(sortOrder)
+                            }
+                        }
                     }
                 }
             }
@@ -239,13 +256,21 @@ fun DetailsText(key: String, value: String, modifier: Modifier = Modifier, overf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopBar(scrollBehavior: TopAppBarScrollBehavior) {
-    CenterAlignedTopAppBar(
+fun TopBar(scrollBehavior: TopAppBarScrollBehavior, onClick: ()->Unit) {
+    TopAppBar(
         title = {
             Text(text = "Items List")
         },
-
-        scrollBehavior = scrollBehavior
+        scrollBehavior = scrollBehavior,
+        actions = {
+            IconButton(onClick = { onClick() }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.baseline_sort_24),
+                    contentDescription = "sort order",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     )
 }
 

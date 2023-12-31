@@ -107,7 +107,6 @@ class ItemDetails : ComponentActivity() {
                         TopBar()
                     }
                 ) {
-                    println("Recomposing............................")
                     val isLoading = itemDetailsViewModel.isLoading.collectAsState()
 
                     if (isLoading.value) {
