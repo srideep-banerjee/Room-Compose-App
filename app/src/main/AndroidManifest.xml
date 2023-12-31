@@ -30,6 +30,7 @@
             android:name=".view.ItemDetails"
             android:exported="false"
             android:label="@string/title_activity_item_details"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.WasteSamaritanAssignment1" />
         <activity
             android:name=".view.MainActivity"
