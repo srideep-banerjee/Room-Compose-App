@@ -20,6 +20,7 @@ abstract class ItemDatabase: RoomDatabase() {
             synchronized(this) {
                 return instance ?:
                 Room.databaseBuilder(context, ItemDatabase::class.java, "item_database")
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { instance = it }
             }

@@ -1,6 +1,7 @@
 package com.example.wastesamaritanassignment1.view
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -47,6 +48,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,56 +93,21 @@ class ItemDetails : ComponentActivity() {
         }
     })
     val id by lazy {
-        intent.extras?.getString("item id")?.toIntOrNull()
+        intent.extras?.getInt("item_id")
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             WasteSamaritanAssignment1Theme {
                 // A surface container using the 'background' color from the theme
 
-                val sheetState = rememberModalBottomSheetState()
-                var bottomSheetOpen by remember { mutableStateOf(false) }
-
-                val context = LocalContext.current
-                var file = context.createImageFile()
-                var uri = FileProvider.getUriForFile(
-                    Objects.requireNonNull(context),
-                    BuildConfig.APPLICATION_ID + ".provider", file
-                )
-
-                var imgState by rememberSaveable {
-                    mutableStateOf(listOf<String>())
-                }
-
-                val cameraLauncher =
-                    rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {
-                        if (it) {
-                            val mutImgs = imgState.toMutableList()
-                            mutImgs.add(0, file.absolutePath)
-                            imgState = mutImgs.toList()
-                        } else {
-                            Toast.makeText(context, "Image not taken", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) {
-                    if (it) {
-                        cameraLauncher.launch(uri)
-                    } else {
-                        Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
                 Scaffold(
                     topBar = {
                         TopBar()
                     }
                 ) {
+                    println("Recomposing............................")
                     val isLoading = itemDetailsViewModel.isLoading.collectAsState()
 
                     if (isLoading.value) {
@@ -157,10 +125,63 @@ class ItemDetails : ComponentActivity() {
                             )
                         }
                     } else {
+
+                        val context = LocalContext.current
+                        var file = context.createImageFile()
+                        var uri = FileProvider.getUriForFile(
+                            Objects.requireNonNull(context),
+                            BuildConfig.APPLICATION_ID + ".provider", file
+                        )
+
+                        var imgState by rememberSaveable {
+                            mutableStateOf(itemDetailsViewModel.item?.images?: listOf())
+                        }
+
+                        val cameraLauncher =
+                            rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {
+                                if (it) {
+                                    val mutableImg = imgState.toMutableList()
+                                    mutableImg.add(0, file.absolutePath)
+                                    imgState = mutableImg
+                                } else {
+                                    Toast.makeText(context, "Image not taken", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+
+                        val permissionLauncher = rememberLauncherForActivityResult(
+                            ActivityResultContracts.RequestPermission()
+                        ) {
+                            if (it) {
+                                cameraLauncher.launch(uri)
+                            } else {
+                                Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
                         Details(
                             item = itemDetailsViewModel.item,
-                            images = imgState,
-                            onSave = { _,_,_,_->
+                            images = imgState.toMutableStateList(),
+                            onSave = { name,qty,rat,rem->
+                                val trimmedName = name.trim()
+                                if (imgState.size <= 1) {
+                                    toast(context, "At least two photos must be provided")
+                                } else if (trimmedName.isEmpty()) {
+                                    toast(context, "Name cannot be empty or whitespace")
+                                } else if (qty.isEmpty()) {
+                                    toast(context, "Quantity must be provided")
+                                } else if (rat == 0) {
+                                    toast(context, "Rating must be provided")
+                                } else {
+                                    itemDetailsViewModel.save(
+                                        imgState,
+                                        trimmedName,
+                                        qty.toIntOrNull() ?: 0,
+                                        rat,
+                                        rem
+                                    ) {
+                                        toast(context, "Details updated")
+                                    }
+                                }
 
                             },
                             onAddPhoto = {
@@ -200,8 +221,8 @@ fun TopBar() {
 @Composable
 fun Details(
     item: Item?,
-    images: List<String>,
-    onSave: (String,String,Int,String)->Unit,
+    images: SnapshotStateList<String>,
+    onSave: (String,String,Int,String?)->Unit,
     onAddPhoto: ()->Unit,
     modifier: Modifier = Modifier
 ) {
@@ -289,7 +310,9 @@ fun Details(
             )
         )
         Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = { /*onSave()*/ }) {
+            Button(onClick = {
+                onSave(nameState.value, qtyState.value, ratState.value, remState.value)
+            }) {
                 Text("Save")
             }
         }
@@ -334,6 +357,10 @@ fun ImageViewer(photos: List<String>, onAddPhoto: () -> Unit) {
         
         AddPhotoButton { onAddPhoto() }
     }
+}
+
+fun toast(context: Context, str: String) {
+    Toast.makeText(context, str, Toast.LENGTH_SHORT).show()
 }
 
 @Preview(showBackground = true)

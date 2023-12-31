@@ -2,11 +2,14 @@ package com.example.wastesamaritanassignment1.viewmodel
 
 import android.app.Application
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wastesamaritanassignment1.model.Item
 import com.example.wastesamaritanassignment1.model.ItemDatabase
+import com.example.wastesamaritanassignment1.model.ItemRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,8 +27,10 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 
-class ItemDetailsViewModel(application: Application, id: Int?): AndroidViewModel(application) {
+class ItemDetailsViewModel(application: Application, val id: Int?): AndroidViewModel(application) {
     private lateinit var _database: ItemDatabase
+
+    private lateinit var repository: ItemRepository
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -39,35 +44,25 @@ class ItemDetailsViewModel(application: Application, id: Int?): AndroidViewModel
             return _database
         }
 
-    fun copyFileAsync(filesDir: String, sourceInputStream: InputStream, onComplete: (String)->Unit){
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val imageFileName = "JPEG_" + timeStamp + "_"
-        val path = "${filesDir}${File.separator}$imageFileName.jpg"
-        val image = File(path)
-        viewModelScope.launch(Dispatchers.IO) {
-            sourceInputStream.use {source ->
-                FileOutputStream(image).use {destination ->
-                    val byteArray = source.readBytes()
-                    destination.write(byteArray)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                onComplete(path)
-            }
+    fun save(images: List<String>, name: String, quantity: Int, ratings: Int, remarks: String?, onComplete: ()->Unit) {
+        repository.upsertItem(Item(id, name, quantity, ratings, remarks, images)){
+            onComplete()
         }
-    }
-
-    fun save(images: List<String>, name: String, quantity: Int, ratings: Int, remarks: String?) {
-
     }
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            _database = ItemDatabase.getDatabase(getApplication<Application>().applicationContext);_isLoading
+            _database = ItemDatabase.getDatabase(getApplication<Application>().applicationContext)
+            repository = ItemRepository(database.itemDao())
+
             if (id != null) {
-                item = database.itemDao().getItem(id)
+                repository.loadItem(id) {
+                    item = it
+                    viewModelScope.launch { _isLoading.emit(false) }
+                }
+            } else {
+                viewModelScope.launch { _isLoading.emit(false) }
             }
-            _isLoading.emit(false)
         }
     }
 }

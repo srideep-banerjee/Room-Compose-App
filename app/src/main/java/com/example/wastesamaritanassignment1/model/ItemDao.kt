@@ -3,18 +3,18 @@ package com.example.wastesamaritanassignment1.model
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ItemDao {
+
     @Upsert
-    suspend fun insert(item: Item)
+    suspend fun upsert(item: Item)
 
     @Query("SELECT * FROM item WHERE id = :id")
-    suspend fun getItem(id: Int): Item
+    fun getItem(id: Int): Item
 
     @Query("SELECT id,name,quantity,rating,remarks FROM item WHERE id = :id")
-    suspend fun getItemShortened(id: Int): ItemDetailsShortened
+    fun getItemShortened(id: Int): ItemDetailsShortened
 
     @Query("SELECT id,name,quantity,rating,remarks FROM item ORDER BY name COLLATE NOCASE")
     fun getItemsByNameAsc(): List<ItemDetailsShortened>
