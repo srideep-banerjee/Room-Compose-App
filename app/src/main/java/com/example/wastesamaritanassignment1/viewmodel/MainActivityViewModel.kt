@@ -1,6 +1,7 @@
 package com.example.wastesamaritanassignment1.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,8 +23,8 @@ class MainActivityViewModel(application: Application): AndroidViewModel(applicat
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _itemList = mutableListOf<ItemDetailsShortened>()
-    val itemList = _itemList.toMutableStateList()
+    private val _itemList = mutableStateListOf<ItemDetailsShortened>()
+    val itemList = _itemList
 
     var sortOrder = ItemOrder.NAME_ASC
         private set

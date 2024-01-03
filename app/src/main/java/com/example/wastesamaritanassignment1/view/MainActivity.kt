@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultCaller
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.registerForActivityResult
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -74,12 +78,22 @@ class MainActivity : ComponentActivity() {
                 val showSortOrderDialog = rememberSaveable {
                     mutableStateOf(false)
                 }
+                val itemDetailsLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) {
+                    mainActivityViewModel.updateSortOrder(mainActivityViewModel.sortOrder)
+                }
+                val context = LocalContext.current
 
                 Scaffold(
                     topBar = { TopBar(scrollBehavior) {
                         showSortOrderDialog.value = true
                     } },
-                    floatingActionButton = { AddButton() },
+                    floatingActionButton = {
+                        AddButton {
+                            itemDetailsLauncher.launch(Intent(context, ItemDetails::class.java))
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(scrollBehavior.nestedScrollConnection)
@@ -103,7 +117,11 @@ class MainActivity : ComponentActivity() {
 
                         ItemList(
                             list =  mainActivityViewModel.itemList.toMutableStateList(),
-
+                            onItemClick = {id ->
+                                val intent = Intent(context, ItemDetails::class.java)
+                                intent.putExtra("item_id", id)
+                                itemDetailsLauncher.launch(intent)
+                            },
                             modifier = Modifier.padding(it)
                         )
 
@@ -119,11 +137,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        mainActivityViewModel.updateSortOrder(ItemOrder.NAME_ASC)
-    }
 }
 
 fun onAddButtonClick(context: Context) {
@@ -137,11 +150,11 @@ fun onItemClick(context: Context, id: Int) {
 }
 
 @Composable
-fun AddButton() {
+fun AddButton(onClick: () -> Unit) {
     val context = LocalContext.current
     FloatingActionButton(
         onClick = {
-            onAddButtonClick(context)
+            onClick()
         },
         shape = CircleShape,
         containerColor = MaterialTheme.colorScheme.primary
@@ -155,7 +168,7 @@ fun AddButton() {
 }
 
 @Composable
-fun ItemList(list: SnapshotStateList<ItemDetailsShortened>, modifier: Modifier = Modifier) {
+fun ItemList(list: SnapshotStateList<ItemDetailsShortened>, modifier: Modifier = Modifier, onItemClick: (Int)->Unit) {
     val context = LocalContext.current
     if (list.size == 0) {
         Box(
@@ -186,7 +199,7 @@ fun ItemList(list: SnapshotStateList<ItemDetailsShortened>, modifier: Modifier =
                         .fillMaxWidth()
                         .clip(shape = RoundedCornerShape(16.dp))
                         .background(color = MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { onItemClick(context, it.id) }
+                        .clickable { onItemClick(it.id) }
                 ) {
                     Row(modifier = Modifier.padding(
                         start = 8.dp,
