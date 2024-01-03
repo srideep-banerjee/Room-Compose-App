@@ -6,20 +6,18 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.Indication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -31,11 +29,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,27 +43,22 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -101,6 +91,11 @@ class ItemDetails : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        onBackPressedDispatcher.addCallback(this) {
+            itemDetailsViewModel.deleteAddedFiles(itemDetailsViewModel.newImagesState.keys.toList())
+            finish()
+        }
         setContent {
             WasteSamaritanAssignment1Theme {
                 // A surface container using the 'background' color from the theme
@@ -128,6 +123,10 @@ class ItemDetails : ComponentActivity() {
                         }
                     } else {
 
+                        val item = remember {
+                            mutableStateOf(itemDetailsViewModel.item)
+                        }
+
                         val context = LocalContext.current
                         var file = context.createImageFile()
                         var uri = FileProvider.getUriForFile(
@@ -135,16 +134,14 @@ class ItemDetails : ComponentActivity() {
                             BuildConfig.APPLICATION_ID + ".provider", file
                         )
 
-                        var imgState by rememberSaveable {
-                            mutableStateOf(itemDetailsViewModel.item?.images?: listOf())
-                        }
+                        val imgState = itemDetailsViewModel.imagesState
+                        val newImgSet = itemDetailsViewModel.newImagesState
 
                         val cameraLauncher =
                             rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {successful ->
                                 if (successful) {
-                                    val mutableImg = imgState.toMutableList()
-                                    mutableImg.add(0, file.absolutePath)
-                                    imgState = mutableImg
+                                    imgState.add(0, file.absolutePath)
+                                    newImgSet[file.absolutePath] = true
                                 } else {
                                     Toast.makeText(context, "Image not taken", Toast.LENGTH_SHORT).show()
                                 }
@@ -161,10 +158,9 @@ class ItemDetails : ComponentActivity() {
                         }
 
                         Details(
-                            item = remember {
-                                mutableStateOf(itemDetailsViewModel.item)
-                            },
-                            images = imgState.toMutableStateList(),
+                            item = item,
+                            images = imgState,
+                            newImages = newImgSet,
                             onSave = { name,qty,rat,rem->
                                 val trimmedName = name.trim()
                                 if (imgState.size <= 1) {
@@ -204,6 +200,12 @@ class ItemDetails : ComponentActivity() {
                                     permissionLauncher.launch(Manifest.permission.CAMERA)
                                 }
                             },
+                            onDeletePhoto = {index ->
+                                val path = imgState[index]
+                                imgState.removeAt(index = index)
+                                newImgSet.remove(path)
+                                itemDetailsViewModel.deleteFile(path)
+                            },
                             modifier = Modifier.padding(it)
                         )
                     }
@@ -226,13 +228,14 @@ fun TopBar() {
 fun Details(
     item: MutableState<Item?>,
     images: SnapshotStateList<String>,
+    newImages: SnapshotStateMap<String, Boolean>,
     onSave: (String,String,Int,String?)->Unit,
     onAddPhoto: ()->Unit,
+    onDeletePhoto: (Int)->Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier
         .padding(horizontal = 8.dp)
-        //.verticalScroll(rememberScrollState())
     ) {
 
         val nameState = rememberSaveable {
@@ -245,13 +248,16 @@ fun Details(
             mutableStateOf(item.value?.remarks?:"")
         }
         val ratState = rememberSaveable {
-            mutableStateOf(item.value?.rating?:0)
+            mutableIntStateOf(item.value?.rating?:0)
         }
 
         Text(text = "PHOTOS", fontSize = 14.sp)
-        ImageViewer(photos = images) {
-            onAddPhoto()
-        }
+        ImageViewer(
+            photos = images,
+            newPhotos = newImages,
+            onAddPhoto = { onAddPhoto() }, onDeletePhoto = {
+                onDeletePhoto(it)
+            })
 
         Spacer(modifier = Modifier.height(8.dp))
         Divider()
@@ -281,7 +287,7 @@ fun Details(
         )
         Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             Button(onClick = {
-                onSave(nameState.value, qtyState.value, ratState.value, remState.value)
+                onSave(nameState.value, qtyState.value, ratState.intValue, remState.value)
             }) {
                 Text("Save")
             }
@@ -347,7 +353,7 @@ fun RatingsViewer(ratState: MutableState<Int>) {
 }
 
 @Composable
-fun ImageViewer(photos: SnapshotStateList<String>, onAddPhoto: () -> Unit) {
+fun ImageViewer(photos: SnapshotStateList<String>, newPhotos: SnapshotStateMap<String, Boolean>, onAddPhoto: () -> Unit, onDeletePhoto: (Int) -> Unit) {
 
     Row(modifier = Modifier
         .height(92.dp)
@@ -364,12 +370,7 @@ fun ImageViewer(photos: SnapshotStateList<String>, onAddPhoto: () -> Unit) {
                     .data(File(photos[it]))
                     .build()
                 Box(
-                    contentAlignment = Alignment.TopEnd,
-//                    modifier = Modifier
-//                        .padding(16.dp)
-//                        .background(MaterialTheme.colorScheme.primary)
-//                        .fillMaxWidth()
-//                        .aspectRatio(1f)
+                    contentAlignment = Alignment.TopEnd
                 ) {
                     AsyncImage(
                         model = imgRequest,
@@ -387,17 +388,20 @@ fun ImageViewer(photos: SnapshotStateList<String>, onAddPhoto: () -> Unit) {
                             .fillMaxWidth()
                             .aspectRatio(1f)
                     )
-                    Image(
-                        painter = rememberAsyncImagePainter(R.drawable.baseline_delete_24),
-                        contentDescription = "Delete image ${it + 1}",
-                        colorFilter = ColorFilter.tint(color = Color.White),
-                        modifier = Modifier
-                            .width(28.dp)
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(Color.Red)
-                            .padding(4.dp)
-                    )
+                    if (photos[it] in newPhotos.keys) {
+                        Image(
+                            painter = rememberAsyncImagePainter(R.drawable.baseline_delete_24),
+                            contentDescription = "Delete image ${it + 1}",
+                            colorFilter = ColorFilter.tint(color = Color.White),
+                            modifier = Modifier
+                                .width(28.dp)
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(Color.Red)
+                                .padding(4.dp)
+                                .clickable { onDeletePhoto(it) }
+                        )
+                    }
                 }
                 if (it !=  photos.size - 1) Spacer(modifier = Modifier.width(8.dp))
             }
@@ -409,18 +413,6 @@ fun ImageViewer(photos: SnapshotStateList<String>, onAddPhoto: () -> Unit) {
     }
 }
 
-fun removeImageIndex() {
-
-}
-
 fun toast(context: Context, str: String) {
     Toast.makeText(context, str, Toast.LENGTH_SHORT).show()
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview2() {
-    WasteSamaritanAssignment1Theme {
-
-    }
 }
