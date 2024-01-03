@@ -100,10 +100,10 @@ class ItemDetails : ComponentActivity() {
         val displayedImage = mutableStateOf<String?>(null)
 
         onBackPressedDispatcher.addCallback(this) {
-            itemDetailsViewModel.deleteAddedFiles(itemDetailsViewModel.newImagesState.keys.toList())
             if (displayedImage.value != null) {
                 displayedImage.value = null
             } else {
+                itemDetailsViewModel.deleteAddedFiles(itemDetailsViewModel.newImagesState.keys.toList())
                 finish()
             }
         }
@@ -134,9 +134,7 @@ class ItemDetails : ComponentActivity() {
                         }
                     } else {
 
-                        val item = remember {
-                            mutableStateOf(itemDetailsViewModel.item)
-                        }
+                        val item = itemDetailsViewModel.item
 
                         val context = LocalContext.current
                         var file = context.createImageFile()
@@ -216,6 +214,7 @@ class ItemDetails : ComponentActivity() {
                                 val path = imgState[index]
                                 imgState.removeAt(index = index)
                                 newImgSet.remove(path)
+                                println("Deleting photo ${path}...................................")
                                 itemDetailsViewModel.deleteFile(path)
                             },
                             modifier = Modifier.padding(it)

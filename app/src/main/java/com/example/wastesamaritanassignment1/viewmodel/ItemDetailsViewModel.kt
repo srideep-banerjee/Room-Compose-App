@@ -1,8 +1,10 @@
 package com.example.wastesamaritanassignment1.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -30,7 +32,7 @@ class ItemDetailsViewModel(application: Application,private val id: Int?): Andro
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    var item: Item? = null
+    var item: MutableState<Item?> = mutableStateOf(null)
         private set
 
     val database: ItemDatabase
@@ -44,7 +46,9 @@ class ItemDetailsViewModel(application: Application,private val id: Int?): Andro
 
     fun save(images: List<String>, name: String, quantity: Int, ratings: Int, remarks: String?, onComplete: ()->Unit) {
         newImagesState.clear()
-        repository.upsertItem(Item(id, name, quantity, ratings, remarks, images)){
+        val newItem = Item(id, name, quantity, ratings, remarks, images)
+        repository.upsertItem(newItem){
+            item.value = newItem
             onComplete()
         }
     }
@@ -89,7 +93,7 @@ class ItemDetailsViewModel(application: Application,private val id: Int?): Andro
 
             if (id != null) {
                 repository.loadItem(id) {
-                    item = it
+                    item.value = it
                     imagesState.addAll(it.images)
                     viewModelScope.launch { _isLoading.emit(false) }
                 }
