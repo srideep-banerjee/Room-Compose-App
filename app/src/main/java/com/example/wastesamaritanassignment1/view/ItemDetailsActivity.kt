@@ -194,7 +194,7 @@ class ItemDetails : ComponentActivity() {
                                 val permissionCheckResult =
                                     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
                                 if (permissionCheckResult == PackageManager.PERMISSION_GRANTED) {
-                                    cameraLauncher.launch(uri);
+                                    cameraLauncher.launch(uri)
                                 } else {
                                     // Request a permission
                                     permissionLauncher.launch(Manifest.permission.CAMERA)

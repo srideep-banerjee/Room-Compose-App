@@ -1,14 +1,11 @@
 package com.example.wastesamaritanassignment1.view
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultCaller
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.registerForActivityResult
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,7 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.wastesamaritanassignment1.R
 import com.example.wastesamaritanassignment1.model.ItemDetailsShortened
-import com.example.wastesamaritanassignment1.model.ItemOrder
 import com.example.wastesamaritanassignment1.ui.theme.WasteSamaritanAssignment1Theme
 import com.example.wastesamaritanassignment1.viewmodel.MainActivityViewModel
 
@@ -126,7 +122,7 @@ class MainActivity : ComponentActivity() {
                         )
 
                         if (showSortOrderDialog.value) {
-                            SortOrderDialog(currentSortOrder = mainActivityViewModel.sortOrder, ) {sortOrder->
+                            SortOrderDialog(currentSortOrder = mainActivityViewModel.sortOrder ) {sortOrder->
                                 showSortOrderDialog.value = false
                                 if(sortOrder != null)
                                     mainActivityViewModel.updateSortOrder(sortOrder)
@@ -139,19 +135,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun onAddButtonClick(context: Context) {
-    context.startActivity(Intent(context, ItemDetails::class.java))
-}
-
-fun onItemClick(context: Context, id: Int) {
-    val intent = Intent(context, ItemDetails::class.java)
-    intent.putExtra("item_id", id)
-    context.startActivity(intent)
-}
-
 @Composable
 fun AddButton(onClick: () -> Unit) {
-    val context = LocalContext.current
     FloatingActionButton(
         onClick = {
             onClick()
@@ -169,7 +154,6 @@ fun AddButton(onClick: () -> Unit) {
 
 @Composable
 fun ItemList(list: SnapshotStateList<ItemDetailsShortened>, modifier: Modifier = Modifier, onItemClick: (Int)->Unit) {
-    val context = LocalContext.current
     if (list.size == 0) {
         Box(
             modifier = modifier

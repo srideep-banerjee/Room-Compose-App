@@ -2,7 +2,6 @@ package com.example.wastesamaritanassignment1.viewmodel
 
 import android.app.Application
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wastesamaritanassignment1.model.ItemDatabase
