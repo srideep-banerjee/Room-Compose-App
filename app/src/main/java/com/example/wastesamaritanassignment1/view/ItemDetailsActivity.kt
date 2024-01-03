@@ -1,6 +1,7 @@
 package com.example.wastesamaritanassignment1.view
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -31,9 +32,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,6 +48,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,10 +97,15 @@ class ItemDetails : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val displayedImage = mutableStateOf<String?>(null)
 
         onBackPressedDispatcher.addCallback(this) {
             itemDetailsViewModel.deleteAddedFiles(itemDetailsViewModel.newImagesState.keys.toList())
-            finish()
+            if (displayedImage.value != null) {
+                displayedImage.value = null
+            } else {
+                finish()
+            }
         }
         setContent {
             WasteSamaritanAssignment1Theme {
@@ -102,7 +113,7 @@ class ItemDetails : ComponentActivity() {
 
                 Scaffold(
                     topBar = {
-                        TopBar()
+                        TopBar(displayedImage)
                     }
                 ) {
                     val isLoading = itemDetailsViewModel.isLoading.collectAsState()
@@ -118,7 +129,7 @@ class ItemDetails : ComponentActivity() {
                                 text = "Loading...",
                                 textAlign = TextAlign.Center,
                                 fontSize = 20.sp,
-                                modifier = Modifier
+                                modifier = Modifier.padding(it)
                             )
                         }
                     } else {
@@ -159,6 +170,7 @@ class ItemDetails : ComponentActivity() {
 
                         Details(
                             item = item,
+                            displayedImage = displayedImage,
                             images = imgState,
                             newImages = newImgSet,
                             onSave = { name,qty,rat,rem->
@@ -217,9 +229,17 @@ class ItemDetails : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopBar() {
+fun TopBar(displayedImage: MutableState<String?>) {
     TopAppBar(title = {
         Text(text = "Item Details")
+    }, navigationIcon = {
+        val activity = (LocalContext.current as? Activity)
+        IconButton(onClick = {
+            if(displayedImage.value == null) activity?.finish()
+            else displayedImage.value = null
+        }) {
+            Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "back")
+        }
     })
 }
 
@@ -227,6 +247,7 @@ fun TopBar() {
 @Composable
 fun Details(
     item: MutableState<Item?>,
+    displayedImage: MutableState<String?>,
     images: SnapshotStateList<String>,
     newImages: SnapshotStateMap<String, Boolean>,
     onSave: (String,String,Int,String?)->Unit,
@@ -250,50 +271,83 @@ fun Details(
         val ratState = rememberSaveable {
             mutableIntStateOf(item.value?.rating?:0)
         }
-
-        Text(text = "PHOTOS", fontSize = 14.sp)
-        ImageViewer(
-            photos = images,
-            newPhotos = newImages,
-            onAddPhoto = { onAddPhoto() }, onDeletePhoto = {
-                onDeletePhoto(it)
-            })
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Divider()
-        Spacer(modifier = Modifier.height(8.dp))
-
-        NameViewer(nameState = nameState)
-
-        QuantityViewer(qtyState = qtyState)
-
-        RatingsViewer(ratState = ratState)
-
-        Text(text = "Remarks:", modifier = Modifier.padding(bottom = 8.dp))
-        TextField(
-            value = remState.value,
-            onValueChange = {if (it.length <= 200) remState.value = it},
-            placeholder = {
-                Text("Enter remarks")
-                          },
-            modifier = Modifier
-                .weight(1f, true)
-                .padding(bottom = 8.dp)
-                .fillMaxWidth(),
-            colors = TextFieldDefaults.colors(
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            )
-        )
-        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = {
-                onSave(nameState.value, qtyState.value, ratState.intValue, remState.value)
-            }) {
-                Text("Save")
+        val saveEnabled = remember {
+            derivedStateOf {
+                if (item.value == null) {
+                    return@derivedStateOf true
+                } else return@derivedStateOf !((item.value?.name ?: "") == nameState.value &&
+                        (item.value?.quantity?.toString()?:"") == qtyState.value &&
+                        (item.value?.rating) == ratState.intValue &&
+                        (item.value?.remarks?:"") == remState.value &&
+                        (item.value?.images?: listOf()).toSet() == images.toSet())
             }
         }
 
+        if (displayedImage.value != null) {
+            ImageDisplayLarge(path = displayedImage.value!!)
+        } else {
+
+            Text(text = "PHOTOS", fontSize = 14.sp)
+            ImageViewer(
+                photos = images,
+                newPhotos = newImages,
+                onAddPhoto = { onAddPhoto() },
+                onDeletePhoto = { onDeletePhoto(it) },
+                onPhotoClicked = { displayedImage.value = it })
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Divider()
+            Spacer(modifier = Modifier.height(8.dp))
+
+            NameViewer(nameState = nameState)
+
+            QuantityViewer(qtyState = qtyState)
+
+            RatingsViewer(ratState = ratState)
+
+            Text(text = "Remarks:", modifier = Modifier.padding(bottom = 8.dp))
+            TextField(
+                value = remState.value,
+                onValueChange = {if (it.length <= 200) remState.value = it},
+                placeholder = {
+                    Text("Enter remarks")
+                },
+                modifier = Modifier
+                    .weight(1f, true)
+                    .padding(bottom = 8.dp)
+                    .fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                )
+            )
+            Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                Button(enabled = saveEnabled.value, onClick = {
+                    onSave(nameState.value, qtyState.value, ratState.intValue, remState.value)
+                }) {
+                    Text("Save")
+                }
+            }
+        }
     }
+}
+
+@Composable
+fun ImageDisplayLarge(path: String) {
+    val imgRequest = ImageRequest
+        .Builder(LocalContext.current)
+        .data(File(path))
+        .build()
+    AsyncImage(
+        model = imgRequest,
+        contentDescription = "Image",
+        contentScale = ContentScale.Inside,
+        placeholder = painterResource(id = R.drawable.outline_timer_24),
+        error = painterResource(id = R.drawable.baseline_error_24),
+        modifier = Modifier
+            .padding(8.dp)
+            .fillMaxSize()
+    )
 }
 
 @Composable
@@ -353,7 +407,13 @@ fun RatingsViewer(ratState: MutableState<Int>) {
 }
 
 @Composable
-fun ImageViewer(photos: SnapshotStateList<String>, newPhotos: SnapshotStateMap<String, Boolean>, onAddPhoto: () -> Unit, onDeletePhoto: (Int) -> Unit) {
+fun ImageViewer(
+    photos: SnapshotStateList<String>,
+    newPhotos: SnapshotStateMap<String, Boolean>,
+    onAddPhoto: () -> Unit,
+    onDeletePhoto: (Int) -> Unit,
+    onPhotoClicked: (String) -> Unit
+) {
 
     Row(modifier = Modifier
         .height(92.dp)
@@ -387,6 +447,7 @@ fun ImageViewer(photos: SnapshotStateList<String>, newPhotos: SnapshotStateMap<S
                             )
                             .fillMaxWidth()
                             .aspectRatio(1f)
+                            .clickable { onPhotoClicked(photos[it]) }
                     )
                     if (photos[it] in newPhotos.keys) {
                         Image(
