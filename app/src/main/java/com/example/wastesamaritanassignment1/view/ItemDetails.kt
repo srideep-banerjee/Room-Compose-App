@@ -3,7 +3,6 @@ package com.example.wastesamaritanassignment1.view
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -12,11 +11,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Indication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -28,20 +31,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,12 +56,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -67,20 +75,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import coil.compose.AsyncImage
-import coil.compose.rememberImagePainter
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import coil.util.DebugLogger
 import com.example.wastesamaritanassignment1.BuildConfig
 import com.example.wastesamaritanassignment1.R
 import com.example.wastesamaritanassignment1.model.Item
 import com.example.wastesamaritanassignment1.view.ui.theme.WasteSamaritanAssignment1Theme
 import com.example.wastesamaritanassignment1.viewmodel.ItemDetailsViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.io.File
-import java.net.URI
 import java.util.Objects
 
 class ItemDetails : ComponentActivity() {
@@ -128,7 +131,7 @@ class ItemDetails : ComponentActivity() {
                         val context = LocalContext.current
                         var file = context.createImageFile()
                         var uri = FileProvider.getUriForFile(
-                            Objects.requireNonNull(context),
+                            context,
                             BuildConfig.APPLICATION_ID + ".provider", file
                         )
 
@@ -137,8 +140,8 @@ class ItemDetails : ComponentActivity() {
                         }
 
                         val cameraLauncher =
-                            rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {
-                                if (it) {
+                            rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {successful ->
+                                if (successful) {
                                     val mutableImg = imgState.toMutableList()
                                     mutableImg.add(0, file.absolutePath)
                                     imgState = mutableImg
@@ -149,8 +152,8 @@ class ItemDetails : ComponentActivity() {
 
                         val permissionLauncher = rememberLauncherForActivityResult(
                             ActivityResultContracts.RequestPermission()
-                        ) {
-                            if (it) {
+                        ) {successful ->
+                            if (successful) {
                                 cameraLauncher.launch(uri)
                             } else {
                                 Toast.makeText(context, "Permission Denied", Toast.LENGTH_SHORT).show()
@@ -158,7 +161,9 @@ class ItemDetails : ComponentActivity() {
                         }
 
                         Details(
-                            item = itemDetailsViewModel.item,
+                            item = remember {
+                                mutableStateOf(itemDetailsViewModel.item)
+                            },
                             images = imgState.toMutableStateList(),
                             onSave = { name,qty,rat,rem->
                                 val trimmedName = name.trim()
@@ -219,25 +224,28 @@ fun TopBar() {
 
 @Composable
 fun Details(
-    item: Item?,
+    item: MutableState<Item?>,
     images: SnapshotStateList<String>,
     onSave: (String,String,Int,String?)->Unit,
     onAddPhoto: ()->Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(horizontal = 8.dp)) {
+    Column(modifier = modifier
+        .padding(horizontal = 8.dp)
+        //.verticalScroll(rememberScrollState())
+    ) {
 
         val nameState = rememberSaveable {
-            mutableStateOf(item?.name?:"")
+            mutableStateOf(item.value?.name?:"")
         }
         val qtyState = rememberSaveable {
-            mutableStateOf(item?.quantity?.toString()?:"")
+            mutableStateOf(item.value?.quantity?.toString()?:"")
         }
         val remState = rememberSaveable {
-            mutableStateOf(item?.remarks?:"")
+            mutableStateOf(item.value?.remarks?:"")
         }
         val ratState = rememberSaveable {
-            mutableStateOf(item?.rating?:0)
+            mutableStateOf(item.value?.rating?:0)
         }
 
         Text(text = "PHOTOS", fontSize = 14.sp)
@@ -246,51 +254,14 @@ fun Details(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider()
+        Divider()
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            Text(text = "Item Name:", modifier = Modifier.width(104.dp))
-            TextField(
-                value = nameState.value,
-                onValueChange = { if (it.length <= 15) nameState.value = it },
-                placeholder = { Text("Enter name") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-        }
+        NameViewer(nameState = nameState)
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            Text(text = "Quantity:", modifier = Modifier.width(104.dp))
-            TextField(
-                value = qtyState.value,
-                onValueChange = {qtyState.value = it},
-                placeholder = { Text("Enter quantity") },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number,),
-                singleLine = true
-            )
-        }
+        QuantityViewer(qtyState = qtyState)
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            Text(text = "Ratings:", modifier = Modifier.width(104.dp))
-
-            for (i in 1..5) {
-
-                Image(
-                    painter = painterResource(
-                        id =
-                        if(i <= ratState.value) R.drawable.baseline_star_24
-                        else R.drawable.baseline_star_outline_24),
-                    contentDescription = if(i <= ratState.value) "star filled" else "star outlined",
-                    colorFilter = ColorFilter.tint(color = MaterialTheme.colorScheme.primary),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { ratState.value = i }
-                );
-            }
-        }
+        RatingsViewer(ratState = ratState)
 
         Text(text = "Remarks:", modifier = Modifier.padding(bottom = 8.dp))
         TextField(
@@ -320,10 +291,66 @@ fun Details(
 }
 
 @Composable
-fun ImageViewer(photos: List<String>, onAddPhoto: () -> Unit) {
+fun NameViewer(nameState: MutableState<String>) {
+
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+        Text(text = "Item Name:", modifier = Modifier.width(104.dp))
+        TextField(
+            value = nameState.value,
+            onValueChange = { if (it.length <= 15) nameState.value = it },
+            placeholder = { Text("Enter name") },
+            modifier = Modifier.weight(1f),
+            singleLine = true
+        )
+    }
+}
+
+@Composable
+fun QuantityViewer(qtyState: MutableState<String>) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+        Text(text = "Quantity:", modifier = Modifier.width(104.dp))
+        TextField(
+            value = qtyState.value,
+            onValueChange = {qtyState.value = it},
+            placeholder = { Text("Enter quantity") },
+            modifier = Modifier
+                .weight(1f),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true
+        )
+    }
+}
+
+@Composable
+fun RatingsViewer(ratState: MutableState<Int>) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+        Text(text = "Ratings:", modifier = Modifier.width(104.dp))
+        val filledStar = rememberAsyncImagePainter(R.drawable.baseline_star_24)
+        val outlinedStar = rememberAsyncImagePainter(R.drawable.baseline_star_outline_24)
+
+        for (i in 1..5) {
+
+            Image(
+                painter = if(i <= ratState.value) filledStar else outlinedStar ,
+                contentDescription = if(i <= ratState.value) "star filled" else "star outlined",
+                colorFilter = ColorFilter.tint(color = MaterialTheme.colorScheme.primary),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { ratState.value = i }
+            )
+        }
+    }
+}
+
+@Composable
+fun ImageViewer(photos: SnapshotStateList<String>, onAddPhoto: () -> Unit) {
 
     Row(modifier = Modifier
-        .fillMaxHeight(0.15f)
+        .height(92.dp)
         .fillMaxWidth()
     ) {
         LazyRow(modifier = Modifier
@@ -336,18 +363,42 @@ fun ImageViewer(photos: List<String>, onAddPhoto: () -> Unit) {
                     .Builder(LocalContext.current)
                     .data(File(photos[it]))
                     .build()
-                AsyncImage(
-                    model = imgRequest,
-                    contentDescription = "Image ${it + 1}",
-                    contentScale = ContentScale.Crop, 
-                    placeholder = painterResource(id = R.drawable.outline_timer_24),
-                    error = painterResource(id = R.drawable.baseline_error_24),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                )
+                Box(
+                    contentAlignment = Alignment.TopEnd,
+//                    modifier = Modifier
+//                        .padding(16.dp)
+//                        .background(MaterialTheme.colorScheme.primary)
+//                        .fillMaxWidth()
+//                        .aspectRatio(1f)
+                ) {
+                    AsyncImage(
+                        model = imgRequest,
+                        contentDescription = "Image ${it + 1}",
+                        contentScale = ContentScale.Crop,
+                        placeholder = painterResource(id = R.drawable.outline_timer_24),
+                        error = painterResource(id = R.drawable.baseline_error_24),
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                    )
+                    Image(
+                        painter = rememberAsyncImagePainter(R.drawable.baseline_delete_24),
+                        contentDescription = "Delete image ${it + 1}",
+                        colorFilter = ColorFilter.tint(color = Color.White),
+                        modifier = Modifier
+                            .width(28.dp)
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Color.Red)
+                            .padding(4.dp)
+                    )
+                }
                 if (it !=  photos.size - 1) Spacer(modifier = Modifier.width(8.dp))
             }
         }
@@ -356,6 +407,10 @@ fun ImageViewer(photos: List<String>, onAddPhoto: () -> Unit) {
         
         AddPhotoButton { onAddPhoto() }
     }
+}
+
+fun removeImageIndex() {
+
 }
 
 fun toast(context: Context, str: String) {
